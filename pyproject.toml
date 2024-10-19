@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autosing"
+version = "0.1.0"
+description = "A tool for automated singing synthesis based on lyrics and accompaniment."
+authors = [
+    { name = "Georg Streich", email = "streichg@ethz.ch" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "audio-separator[gpu]@git+https://github.com/streichgeorg/python-audio-separator",
+    "einops==0.8.0",
+    "faker=30.4.0",
+    "g2p_en==2.1.0",
+    "huggingface-hub==0.25.2",
+    "lightning==2.3.1",
+    "nltk==3.9.1",
+    "openai-whisper==20240930",
+    "pandas==2.0.3",
+    "pyarrow==17.0.0",
+    "snac==1.2.0",
+    "streamlit==1.39.0",
+    "tqdm==4.66.5",
+    "transformers[torch]==4.45.2",
+    "vector-quantize-pytorch==1.6.22",
+    "WhisperSpeech@git+https://github.com/streichgeorg/WhisperSpeech",
+    "wandb==0.17.3",
+    "wandb==0.17.3",
+    "webdataset==0.2.86",
+]
+
+[project.urls]
+"Source Code" = "https://github.com/streichgeorg/autosing"
+
+[tool.ruff.lint]
+ignore = ["E701", "E402", "F405", "F403"]
+
