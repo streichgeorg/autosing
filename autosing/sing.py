@@ -38,7 +38,6 @@ def compute_spk_emb(spkfile):
     return spk_emb
 
 def sing(args):
-
     src_sep_dir = Path("tmp")
     ref = Path(args.reference)
 
@@ -48,7 +47,7 @@ def sing(args):
     except StopIteration:
         separator = Separator(
             output_dir=src_sep_dir,
-            model_file_dir="/p/home/jusers/streich1/juwels/myhome/audio-separator-models",
+            model_file_dir=pathlib.Path.home() / ".cache/audio-separator-models"
         )
         separator.load_model()
         mfile, semfile = tuple(src_sep_dir / x for x in separator.separate(args.reference))
@@ -74,9 +73,7 @@ def sing(args):
     if not args.gen_semantic or args.semfile:
         semfile = args.semfile or semfile
 
-        sem_model = autosing.bn_whisper.load_model("../bn_whisper_v1.model").cuda()
-        sem_model.whisper_model_name = "../ft_whisper_small_improved.pt"
-        sem_model.ensure_whisper()
+        sem_model = autosing.bn_whisper.load_model("streich/bn_whisper").cuda()
 
         audio, sample_rate = torchaudio.load(semfile)
         audio = audio[:, int(sample_rate * args.start_time):]
@@ -126,7 +123,6 @@ def sing(args):
     sm2a_model.ctx_n = template.shape[-1]
     sm2a_model.optimize(torch_compile=False, max_batch_size=args.batch_size)
 
-    # Have to round this up to 8 because of the snac encoding
     N = int((args.length * codec.frame_rate) // codec.alignment * codec.alignment)
 
     sm2a_mtoks = apply_pattern("bricks", mtoks, codec.num_codes)
@@ -160,7 +156,7 @@ def sing(args):
         waveform = vocals + args.music_volume * instrumental[:, :vocals.shape[-1]]
 
         torchaudio.save(
-            output_dir / f"{Path(args.reference).stem}_{args.lyrics_idx}_{i}.mp3",
+            output_dir / f"{Path(args.reference).stem}_{i}.mp3",
             waveform,
             codec.sample_rate,
         )
@@ -176,7 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--length", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--spkfile", default=None)
-    parser.add_argument("--gen-semantic", type=bool, default=True)
+    parser.add_argument("--gen-semantic", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--semfile", type=str, default=None)
     parser.add_argument("--tts", type=bool, default=False)
     parser.add_argument("--output-dir", default="sing_output")
