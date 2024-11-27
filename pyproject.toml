@@ -14,7 +14,7 @@ requires-python = ">=3.9"
 dependencies = [
     "audio-separator[gpu]@git+https://github.com/streichgeorg/python-audio-separator",
     "einops==0.8.0",
-    "faker=30.4.0",
+    "Faker==30.4.0",
     "g2p_en==2.1.0",
     "huggingface-hub==0.25.2",
     "lightning==2.3.1",
@@ -39,3 +39,5 @@ dependencies = [
 [tool.ruff.lint]
 ignore = ["E701", "E402", "F405", "F403"]
 
+[tool.setuptools.packages.find]
+include = ["autosing"]
