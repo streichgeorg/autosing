@@ -1,0 +1,3 @@
+[submodule "charsiu"]
+	path = charsiu
+    url = https://github.com/streichgeorg/charsiu
