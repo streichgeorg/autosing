@@ -185,6 +185,9 @@ class Embedder(nn.Module):
         if spec is None:
             spec = torch.load(local_filename, map_location=device)
 
+        if "encoder_depth_ratio" in spec["tunables"]:
+            del spec["tunables"]["encoder_depth_ratio"]
+
         model = cls(**spec['config'], tunables=Tunables(**spec['tunables']))
         model.load_state_dict(spec['state_dict'])
         model.eval().to(device)
