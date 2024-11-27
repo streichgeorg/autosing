@@ -42,6 +42,7 @@ def align(args):
     table = pd.read_parquet(
         dataset_dir / f"{args.partition}/index.parquet"
     ).set_index("id")
+
     it = table.to_dict(orient="records")
 
     df = pd.DataFrame(columns=["id", "alignment"])
@@ -116,7 +117,7 @@ def vad_extract(args):
         alignment = pd.read_parquet(alignment_file).set_index("id")
         index = pd.concat([index, alignment], axis=1, join="inner")
 
-    df = pd.DataFrame(columns=["id", "audio", "alignment"])
+    df = pd.DataFrame(columns=["id", "audio", "alignment", "artist"])
 
     it = zip(
         index.index,
@@ -154,7 +155,11 @@ def vad_extract(args):
                 f"{row_id}_at_{offset}",
                 buf.read(),
                 alignment,
+                row["artist"],
             ]
+
+            if len(df) >= args.num: break
+        if len(df) >= args.num: break
 
     df.to_parquet(dataset_dir / f"{args.partition}" / "chunked.parquet")
 
@@ -203,7 +208,7 @@ def src_sep(args):
         vocal_queue.put((ids, stems["Vocals"]))
         no_vocal_queue.put((ids, stems["Instrumental"]))
         count += len(ids)
-        if count > args.num: break
+        if count >= args.num: break
 
     vocal_queue.put(None)
     no_vocal_queue.put(None)
@@ -226,7 +231,7 @@ def atoks(args):
         sample_rate=codec.sample_rate,
         num_channels=1,
     )
-    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=4)
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=args.num_workers)
 
     result = pd.DataFrame(columns=["id", "values"])
 
@@ -257,7 +262,7 @@ def stoks(args):
         sample_rate=sample_rate,
         num_channels=1,
     )
-    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=8)
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=args.num_workers)
 
     result = pd.DataFrame(columns=["id", "values"])
 
@@ -287,10 +292,10 @@ def artist_embs(args):
         args.dir,
         [args.partition],
         inference=True,
-        chunk_length=30,
+        chunk_size=3 * model.ctx_n,
         shufbuf_size=1,
     )
-    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=1)
+    dl = torch.utils.data.DataLoader(ds, batch_size=args.batch_size, num_workers=args.num_workers)
 
     result = pd.DataFrame(columns=["id", "embs"])
 
@@ -298,7 +303,7 @@ def artist_embs(args):
         atoks = rearrange(entry["atoks"], "b q (n t) -> (b n) q t", n=3)
 
         with torch.inference_mode():
-            batched_embs = model(atoks.cuda(), noloss=True).cpu()
+            batched_embs = model(atoks.cuda(), noloss=True, flattened=False).cpu()
         batched_embs = rearrange(batched_embs, "(b n) ... -> b n ...", n=3)
 
         for eid, embs in zip(entry["id"], batched_embs):
@@ -308,12 +313,6 @@ def artist_embs(args):
     result.to_parquet(
         dataset_dir / str(args.partition) / "artist_embs.parquet"
     )
-
-def missing(dataset_dir, what, n):
-    dataset_dir = pathlib.Path(dataset_dir)
-    done = set(int(f.parts[-2]) for f in pathlib.Path(dataset_dir).glob(f"**/{what}"))
-    missing = sorted(list(set(range(n)) - done))
-    return missing
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter, epilog=help_text)
@@ -343,26 +342,16 @@ if __name__ == "__main__":
     parser.add_argument("--audio-src", default="chunked")
     parser.add_argument("--fc-model", default="streich/singing_va")
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument("--complete-missing", type=str, default=None)
     parser.add_argument("--total-partitions", type=int, default=None)
     parser.add_argument("--audio-format", type=str, default="opus")
+    parser.add_argument("--num-workers", type=int, default=0, help="Number of dataloader workers")
 
     args = parser.parse_args()
     print(args)
 
-    if args.complete_missing is not None:
-        missing_partitions = missing(
-            args.dir, args.complete_missing, args.total_partitions
-        )
-
     partition = args.partition
     for i in range(args.num_partitions):
-        if args.complete_missing is not None:
-            if partition + i >= len(missing_partitions): break
-            args.partition = missing_partitions[partition + i]
-            print(f"Completing partition {args.partition}")
-        else:
-            args.partition = partition + i
+        args.partition = partition + i
 
         try:
             if args.cmd == "src_sep":

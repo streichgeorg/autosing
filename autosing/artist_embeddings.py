@@ -224,32 +224,37 @@ class EmbeddingDataset(SimpleDataset):
         df["atoks"] = df["values"].apply(lambda x: torch.tensor(x.reshape(4, -1)))
         chunk_size = self.chunk_size
         if chunk_size is not None:
-            full_length = df["atoks"].iloc[0].shape[0]
+            full_length = df["atoks"].iloc[0].shape[1]
             expanded = None
             for offset in range(0, full_length, chunk_size):
-                sliced = df
-                sliced["atoks"] = sliced["atoks"].apply(lambda x: x[:, offset:offset + chunk_size])
-                if expanded: expanded = pd.concat([expanded, sliced])
-                else: expanded = sliced
-            df = expanded
-        df["id"] = df.index
+                if offset + chunk_size > full_length: break
 
-        return df
+                sliced = pd.DataFrame({
+                    "id": df.index.map(lambda x: x + f"_{offset}"),
+                    "atoks": df["atoks"].apply(lambda x: x[:, offset:offset + chunk_size]),
+                })
+                if not self.inference:
+                    sliced["artist"] = df["artist"]
+
+                if expanded is not None: expanded = pd.concat([expanded, sliced])
+                else: expanded = sliced
+
+        return expanded
 
     def entries(self):
         import torch
 
         for entry in super().entries():
-            artist_id = self.artists.get(entry.get("artist", None), None)
             atoks = entry["atoks"]
 
             flattened = flatten_snac(atoks)
             if self.inference:
                 yield {
                     "id": entry["id"],
-                    "atoks": chunk,
+                    "atoks": atoks,
                 }
             else:
+                artist_id = self.artists.get(entry.get("artist", None), None)
                 sample = (flattened, torch.tensor(artist_id))
                 yield tuple(x.unsqueeze(0).clone() for x in sample)
 
@@ -278,11 +283,12 @@ def load_model(*args, **kwargs):
     model = Embedder.load_model(*args, **kwargs)
     return model
 
-def collect_artists(dataset, min_count):
+def collect_artists(datasets, min_count):
     counts = defaultdict(int)
-    for idx in dataset.subset:
-        for artist in dataset.load_df(idx, "chunked", columns=["artist"])["artist"]:
-            counts[artist] += 1
+    for dataset in datasets:
+        for idx in dataset.subset:
+            for artist in dataset.load_df(idx, "chunked", columns=["artist"])["artist"]:
+                counts[artist] += 1
 
     result = dict()
 
@@ -304,14 +310,18 @@ if __name__ == "__main__":
     parser.add_argument("--output-path", default="artist_ids.json")
     parser.add_argument(
         "--min-sample-count",
-        type=int, default=100,
+        type=int, default=2,
         help="Minimum number of samples for an artist to be included"
     )
     args = parser.parse_args()
 
     dataset_config = json.loads(args.dataset_config)
-    dataset = load_dataset("train", artist_file=None, inference=True, **dataset_config)
-    artist_ids = collect_artists(dataset, args.min_sample_count)
+
+    artist_ids = collect_artists([
+        load_dataset("val", artist_file=None, inference=True, **dataset_config),
+        load_dataset("train", artist_file=None, inference=True, **dataset_config),
+    ], args.min_sample_count)
+
     with open(args.output_path, "w") as f:
         json.dump(artist_ids, f)
 
