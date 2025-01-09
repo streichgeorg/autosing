@@ -3,7 +3,6 @@ import argparse
 from pathlib import Path
 import gc
 
-
 import torch
 import torchaudio
 from einops import rearrange
@@ -26,7 +25,7 @@ def compute_spk_emb(spkfile):
     spk_audio = torchaudio.functional.resample(spk_audio, sample_rate, codec.sample_rate)
     atoks = codec.encode(spk_audio[None, :, :30 * codec.sample_rate])
     atoks = rearrange(atoks, "b q (n t) -> (b n) q t", n=3)
-    emb_model = autosing.artist_embeddings.load_model("../artist_embeddings_v2.model").cuda()
+    emb_model = autosing.artist_embeddings.load_model("streich/artist_emb:artist_emb.model").cuda()
     with torch.inference_mode():
         batched_embs = emb_model(atoks.cuda(), noloss=True, flattened=False).cpu()
         spk_emb = rearrange(batched_embs, "(b n) ... -> b n ...", n=3).mean(1)[0]
@@ -47,7 +46,7 @@ def sing(args):
     except StopIteration:
         separator = Separator(
             output_dir=src_sep_dir,
-            model_file_dir=pathlib.Path.home() / ".cache/audio-separator-models"
+            model_file_dir=Path.home() / ".cache/audio-separator-models"
         )
         separator.load_model()
         mfile, semfile = tuple(src_sep_dir / x for x in separator.separate(args.reference))
@@ -164,8 +163,8 @@ def sing(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("reference")
-    parser.add_argument("--sm2a-model", default="models/sm2a.model")
-    parser.add_argument("--tm2s-model", default="models/t2s.model")
+    parser.add_argument("--sm2a-model", default="autosing-models/autosing:sm2a.model")
+    parser.add_argument("--tm2s-model", default="autosing-models/autosing:t2s.model")
     parser.add_argument("--music-volume", type=float, default=0.8)
     parser.add_argument("--lyrics", default=None)
     parser.add_argument("--start-time", type=int, default=0)

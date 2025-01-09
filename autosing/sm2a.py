@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.profiler import record_function
+from huggingface_hub import hf_hub_download
 
 from fastprogress import progress_bar
 from fastcore.basics import store_attr
@@ -530,7 +531,7 @@ class SM2ATransformer(SADelARTransformer):
             else:
                 local_filename = ref
         if not local_filename and spec is None:
-            raise NotImplementedError()
+            local_filename = hf_hub_download(repo_id=repo_id, filename=filename)
         if spec is None:
             spec = torch.load(local_filename, map_location=device)
         if '_extra_state' not in spec['state_dict'] and 'speaker_map' in spec['config']: spec['state_dict']['_extra_state'] = { 'speaker_map': spec['config']['speaker_map'] }
