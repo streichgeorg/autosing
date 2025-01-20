@@ -59,10 +59,8 @@ python3 autosing/train.py --task_name sm2a \
 Samples can be generated using the `sing.py` script like this. The script expects two lines of lyrics, the first (second) line controls the first (last) 15 seconds of output.
 
 ```
-python3 autosing/sing.py \
---reference <reference song to take the instrumentals and artist embedding from> \
---sm2a-model <trained sm2a model> --t2s-model <trained t2s model> \
---lyrics $'la la la la\nla la la la'
+python3 autosing/sing.py <audiofile containing reference song excerpt> \
+--lyrics $'i saw you standing under moonlight your eyes like diamonds in the sky i felt a spark ignite oh couldn\'t help but catch your smile\n we were strangers in a crowded room but something pulled me close to you a whisper in the wind oh a heartbeat racing to the truth'
 ```
 
 ## Acknowledgments
