@@ -25,7 +25,7 @@ def compute_spk_emb(spkfile):
     spk_audio = torchaudio.functional.resample(spk_audio, sample_rate, codec.sample_rate)
     atoks = codec.encode(spk_audio[None, :, :30 * codec.sample_rate])
     atoks = rearrange(atoks, "b q (n t) -> (b n) q t", n=3)
-    emb_model = autosing.artist_embeddings.load_model("streich/artist_emb:artist_emb.model").cuda()
+    emb_model = autosing.artist_embeddings.load_model("autosing-models/autosing:artist_emb.model").cuda()
     with torch.inference_mode():
         batched_embs = emb_model(atoks.cuda(), noloss=True, flattened=False).cpu()
         spk_emb = rearrange(batched_embs, "(b n) ... -> b n ...", n=3).mean(1)[0]
@@ -160,13 +160,15 @@ def sing(args):
             codec.sample_rate,
         )
 
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("reference")
     parser.add_argument("--sm2a-model", default="autosing-models/autosing:sm2a.model")
     parser.add_argument("--tm2s-model", default="autosing-models/autosing:t2s.model")
+    parser.add_argument("--lyrics")
     parser.add_argument("--music-volume", type=float, default=0.8)
-    parser.add_argument("--lyrics", default=None)
     parser.add_argument("--start-time", type=int, default=0)
     parser.add_argument("--length", type=int, default=15)
     parser.add_argument("--batch-size", type=int, default=8)
@@ -178,6 +180,8 @@ if __name__ == "__main__":
     parser.add_argument("--spk-alpha", type=float, default=1.0)
     parser.add_argument("--temp", type=float, default=0.7)
     args = parser.parse_args()
+
+    print(args.lyrics)
 
     if args.tts:
         args.music_volume = 0
